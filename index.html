@@ -1,12 +1,147 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Drainage Network Decision Support Dashboard</title>
+<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css"/>
+<style>
+:root{
+  --navy:#0B3D5C;--navy-deep:#082C44;--teal:#1C7293;--teal-pale:#EAF3F7;
+  --ink:#1E293B;--muted:#5B6B79;--paper:#F6F9FA;--line:#DCE6EB;--amber:#B9893D;
+  --green-bg:#DCEEDD;--green-tx:#1E7B45;--amber-bg:#FCF0D2;--amber-tx:#8A5E04;
+  --orange-bg:#FBE2C8;--orange-tx:#B6560F;--red-bg:#F8D7D5;--red-tx:#B3261E;
+  --maroon-bg:#7B1B1B;--maroon-tx:#FFFFFF;--gray-bg:#EEF1F3;--gray-tx:#7C8A96;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--paper);display:flex;flex-direction:column;overflow:hidden}
 
-<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css" />
-<link rel="stylesheet" href="assets/app.css" />
+/* ─── Header ─── */
+.app-header{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:8px 18px;
+  background:linear-gradient(180deg,var(--navy) 0%,var(--navy-deep) 100%);
+  color:#fff;flex:0 0 auto;
+}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand-mark{width:28px;height:28px;color:#9FC7DC;flex:0 0 auto}
+.brand-text{min-width:0}
+.brand-title{font-size:16px;font-weight:700;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand-sub{font-size:11px;color:#AFCBDC;margin-top:1px}
+/* Paramount logo in header */
+.header-logo{height:38px;width:auto;object-fit:contain;background:white;border-radius:5px;padding:3px 7px;flex:0 0 auto}
+.drain-filter{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.drain-filter label{font-size:12px;color:#CFE3EE}
+.drain-filter select{background:#fff;color:var(--ink);border:none;border-radius:6px;padding:7px 10px;font-size:13px;min-width:230px;cursor:pointer}
+
+/* ─── Tabs ─── */
+.tabbar{display:flex;gap:2px;background:var(--navy-deep);padding:0 16px;flex:0 0 auto}
+.tab-btn{background:transparent;border:none;color:#AFCBDC;padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;transition:color .15s,border-color .15s}
+.tab-btn:hover{color:#fff}
+.tab-btn.active{color:#fff;border-bottom-color:var(--amber)}
+main{flex:1 1 auto;min-height:0;position:relative}
+.tab-panel{display:none;height:100%;overflow:auto}
+.tab-panel.active{display:block}
+
+/* ─── Map ─── */
+#tab-map{overflow:hidden}
+.map-shell{display:flex;height:100%}
+.map-area{flex:1 1 auto;position:relative;min-width:0}
+#map{position:absolute;inset:0;background:#dfe9ec}
+.legend-panel{width:320px;flex:0 0 auto;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;height:100%}
+.legend-panel-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;font-weight:700;font-size:15px;border-bottom:1px solid var(--line);color:var(--navy)}
+.icon-btn{background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted);padding:2px 6px;border-radius:4px}
+.icon-btn:hover{background:var(--teal-pale);color:var(--navy)}
+.legend-expand-btn{position:absolute;top:10px;left:10px;z-index:500;background:#fff;border:1px solid var(--line);border-radius:6px;padding:7px 12px;font-size:12px;font-weight:600;color:var(--navy);box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.legend-search{padding:10px 12px;border-bottom:1px solid var(--line);position:relative}
+.legend-search input{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;font-size:12.5px}
+.legend-search input:focus{outline:2px solid var(--teal);outline-offset:1px}
+.search-results{position:absolute;left:12px;right:12px;top:42px;background:#fff;border:1px solid var(--line);border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.12);z-index:600;max-height:240px;overflow:auto;display:none}
+.search-results.show{display:block}
+.search-result-item{padding:8px 10px;font-size:12.5px;cursor:pointer;border-bottom:1px solid var(--line)}
+.search-result-item:last-child{border-bottom:none}
+.search-result-item:hover{background:var(--teal-pale)}
+.sr-type{color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.4px}
+.legend-body{flex:1 1 auto;overflow:auto;padding-bottom:20px}
+.legend-head-block{border-bottom:1px solid var(--line)}
+.legend-head-title{font-weight:700;font-size:13px;color:var(--navy);background:var(--teal-pale);padding:9px 14px;letter-spacing:.2px}
+.legend-datagroup-title{font-size:11.5px;font-weight:700;color:var(--muted);padding:8px 14px 4px;text-transform:uppercase;letter-spacing:.5px}
+.legend-group{border-bottom:1px solid #EEF2F4}
+.legend-group-head{display:flex;align-items:center;gap:7px;padding:8px 14px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--ink);user-select:none}
+.legend-group-head:hover{background:#FAFCFD}
+.legend-group-head .chev{transition:transform .15s;color:var(--muted);font-size:10px}
+.legend-group.collapsed .chev{transform:rotate(-90deg)}
+.legend-group.collapsed .legend-group-layers{display:none}
+.legend-group-layers{padding:2px 14px 8px 30px}
+.legend-layer-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12.5px}
+.legend-layer-row input[type=checkbox]{accent-color:var(--teal);cursor:pointer}
+.legend-layer-row label{cursor:pointer;flex:1}
+.legend-swatch{width:14px;height:14px;border-radius:3px;flex:0 0 auto;border:1px solid rgba(0,0,0,.15)}
+.legend-swatch.line{height:3px;border-radius:0;border:none}
+.legend-lowhigh{color:var(--muted);font-size:10.5px}
+.legend-empty-note{padding:16px 14px;font-size:12.5px;color:var(--muted);line-height:1.5}
+.north-arrow{position:absolute;right:14px;top:14px;z-index:500;background:rgba(255,255,255,.85);border-radius:6px;padding:4px 8px 2px;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.active-layers-box{position:absolute;right:14px;bottom:34px;z-index:500;background:rgba(255,255,255,.93);border-radius:8px;padding:8px 10px;box-shadow:0 1px 6px rgba(0,0,0,.18);max-width:240px;max-height:180px;overflow:auto;border:1px solid var(--line)}
+.alb-head{font-weight:700;font-size:11.5px;color:var(--navy);margin-bottom:5px}
+.alb-list{display:flex;flex-direction:column;gap:3px}
+.alb-empty{font-size:11.5px;color:var(--muted);font-style:italic}
+.alb-item{display:flex;align-items:center;gap:6px;font-size:11.5px;line-height:1.3}
+.alb-dot{width:9px;height:9px;border-radius:3px;flex:0 0 auto;border:1px solid rgba(0,0,0,.15)}
+.alb-dot.round{border-radius:50%}
+.alb-remove{margin-left:auto;cursor:pointer;color:var(--muted);font-size:13px;padding:0 2px;flex:0 0 auto}
+.alb-remove:hover{color:var(--red-tx)}
+
+/* ─── Popups ─── */
+.leaflet-popup-content-wrapper{border-radius:8px}
+.leaflet-popup-content{font-family:inherit;font-size:12.5px;min-width:220px}
+.popup-title{font-weight:700;font-size:13.5px;color:var(--navy);margin-bottom:5px}
+.popup-row{display:flex;justify-content:space-between;gap:10px;padding:2px 0;border-bottom:1px dashed #EEF2F4}
+.popup-row span:first-child{color:var(--muted)}
+.popup-row span:last-child{font-weight:600;text-align:right}
+.popup-dim-box{background:var(--teal-pale);border:1px solid var(--teal);border-radius:6px;padding:7px 10px;margin:6px 0 2px}
+.popup-dim-box .dim-title{font-weight:700;font-size:12px;color:var(--navy);margin-bottom:4px}
+.popup-dim-box .dim-row{display:flex;justify-content:space-between;padding:2px 0}
+.popup-dim-box .dim-row span:first-child{color:var(--muted);font-size:12px}
+.popup-dim-box .dim-row span:last-child{font-weight:700;color:var(--navy);font-size:13px}
+.gt-thumb-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.gt-thumb-row img{width:56px;height:56px;object-fit:cover;border-radius:5px;cursor:pointer;border:1px solid var(--line)}
+.chip{display:inline-block;padding:1.5px 8px;border-radius:10px;font-size:11px;font-weight:700}
+.chip-green{background:var(--green-bg);color:var(--green-tx)}
+.chip-amber{background:var(--amber-bg);color:var(--amber-tx)}
+.chip-orange{background:var(--orange-bg);color:var(--orange-tx)}
+.chip-red{background:var(--red-bg);color:var(--red-tx)}
+.chip-maroon{background:var(--maroon-bg);color:var(--maroon-tx)}
+.chip-gray{background:var(--gray-bg);color:var(--gray-tx)}
+
+/* ─── Content panels ─── */
+.panel-content{max-width:1180px;margin:0 auto;padding:26px 28px 60px}
+.panel-content h2{color:var(--navy);margin:0 0 4px;font-size:23px}
+.panel-note{color:var(--muted);font-size:13px;margin:0 0 20px}
+.section-subhead{color:var(--navy);font-size:17px;margin:34px 0 12px}
+.card-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px 18px;box-shadow:0 1px 3px rgba(20,40,60,.04)}
+.card h3{margin:0 0 10px;font-size:13.5px;color:var(--navy)}
+.full-width{grid-column:1/-1;margin-top:18px}
+.card-row-head{display:flex;align-items:center;justify-content:space-between}
+.card-row-head select{padding:5px 8px;border-radius:6px;border:1px solid var(--line);font-size:12.5px}
+table.data-table{width:100%;border-collapse:collapse;font-size:12.5px}
+table.data-table th{background:var(--navy);color:#fff;text-align:left;padding:8px 10px;font-weight:700;position:sticky;top:0;font-size:11.5px}
+table.data-table td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+table.data-table tr:nth-child(even) td{background:#FAFCFD}
+.table-scroll{overflow:auto;border:1px solid var(--line);border-radius:10px;max-height:560px}
+.report-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:18px;text-align:center}
+.report-card .rc-icon{font-size:34px;margin-bottom:8px}
+.report-card a.rc-btn{display:inline-block;margin-top:10px;background:var(--navy);color:#fff;text-decoration:none;padding:8px 16px;border-radius:6px;font-size:12.5px;font-weight:600}
+.report-card a.rc-btn:hover{background:var(--teal)}
+
+/* ─── Photo modal ─── */
+.photo-modal{position:fixed;inset:0;background:rgba(8,20,30,.82);display:none;align-items:center;justify-content:center;z-index:2000}
+.photo-modal.show{display:flex}
+.photo-modal-inner{position:relative;max-width:90vw;max-height:88vh;text-align:center}
+.photo-modal-inner img{max-width:90vw;max-height:78vh;border-radius:8px}
+#photoModalCaption{color:#fff;margin-top:10px;font-size:13px}
+.photo-modal-inner .icon-btn{position:absolute;top:-34px;right:-6px;color:#fff;font-size:24px}
+</style>
 </head>
 <body>
 
@@ -30,6 +165,9 @@
       <option value="drain2">Z Block Drain (Ward 177)</option>
     </select>
   </div>
+
+  <!-- Correction 1: Paramount Global Services logo -->
+  <img src="assets/paramount_logo.png" class="header-logo" alt="Paramount Global Services" title="Prepared by Paramount Global Services Private Limited"/>
 </header>
 
 <nav class="tabbar" id="tabbar">
@@ -41,30 +179,27 @@
 </nav>
 
 <main>
-
-  <!-- ============ MAP TAB ============ -->
   <section class="tab-panel active" id="tab-map">
     <div class="map-shell">
       <aside class="legend-panel" id="legendPanel">
         <div class="legend-panel-head">
           <span>Layers</span>
-          <button id="legendCollapseBtn" class="icon-btn" title="Collapse panel">&laquo;</button>
+          <button id="legendCollapseBtn" class="icon-btn" title="Collapse">&laquo;</button>
         </div>
         <div class="legend-search">
           <input type="text" id="searchBox" placeholder="Search reach, location, place..." autocomplete="off"/>
           <div id="searchResults" class="search-results"></div>
         </div>
-        <div class="legend-body" id="legendBody"><!-- built by JS --></div>
+        <div class="legend-body" id="legendBody"></div>
       </aside>
-
       <div class="map-area">
         <div id="map"></div>
-        <button id="legendExpandBtn" class="icon-btn legend-expand-btn" title="Show layers" style="display:none;">&raquo; Layers</button>
+        <button id="legendExpandBtn" class="icon-btn legend-expand-btn" style="display:none">&raquo; Layers</button>
         <div class="active-layers-box" id="activeLayersBox">
           <div class="alb-head">On the Map</div>
           <div class="alb-list" id="activeLayersList"></div>
         </div>
-        <div class="north-arrow" title="North">
+        <div class="north-arrow">
           <svg viewBox="0 0 30 60" width="22" height="44">
             <polygon points="15,0 24,38 15,29 6,38" fill="#1E293B"/>
             <text x="15" y="55" text-anchor="middle" font-size="13" font-weight="700" fill="#1E293B">N</text>
@@ -74,32 +209,21 @@
     </div>
   </section>
 
-  <!-- ============ RAINFALL TAB ============ -->
   <section class="tab-panel" id="tab-rainfall">
     <div class="panel-content">
       <h2>IMD Rainfall Statistics &mdash; Delhi</h2>
-      <p class="panel-note">Daily rainfall records, 1981 &ndash; present, India Meteorological Department.</p>
+      <p class="panel-note">Daily rainfall records, 1981&ndash;present, India Meteorological Department.</p>
       <div class="card-grid">
-        <div class="card chart-card">
-          <h3>Annual Rainfall Total &amp; Rainy Days</h3>
-          <canvas id="chartAnnualTotal" height="220"></canvas>
-        </div>
-        <div class="card chart-card">
-          <h3>Annual Maximum Single-Day Rainfall</h3>
-          <canvas id="chartAnnualMax" height="220"></canvas>
-        </div>
+        <div class="card"><h3>Annual Rainfall Total &amp; Rainy Days</h3><canvas id="chartAnnualTotal" height="220"></canvas></div>
+        <div class="card"><h3>Annual Maximum Single-Day Rainfall</h3><canvas id="chartAnnualMax" height="220"></canvas></div>
       </div>
-      <div class="card chart-card full-width">
-        <div class="card-row-head">
-          <h3>Daily Rainfall &mdash; Select Year</h3>
-          <select id="yearSelect"></select>
-        </div>
+      <div class="card full-width">
+        <div class="card-row-head"><h3>Daily Rainfall &mdash; Select Year</h3><select id="yearSelect"></select></div>
         <canvas id="chartDaily" height="140"></canvas>
       </div>
     </div>
   </section>
 
-  <!-- ============ DSS TAB ============ -->
   <section class="tab-panel" id="tab-dss">
     <div class="panel-content">
       <h2>Decision Support System &mdash; Reach Matrix</h2>
@@ -108,7 +232,6 @@
     </div>
   </section>
 
-  <!-- ============ RECOMMENDATIONS TAB ============ -->
   <section class="tab-panel" id="tab-recommend">
     <div class="panel-content">
       <h2>Recommendations</h2>
@@ -118,15 +241,13 @@
     </div>
   </section>
 
-  <!-- ============ REPORTS TAB ============ -->
   <section class="tab-panel" id="tab-reports">
     <div class="panel-content">
       <h2>Report Reference</h2>
-      <p class="panel-note">Full assessment reports for each drain, provided for reference and methodology.</p>
+      <p class="panel-note">Full assessment reports for each drain.</p>
       <div class="card-grid" id="reportCards"></div>
     </div>
   </section>
-
 </main>
 
 <div id="photoModal" class="photo-modal">
@@ -137,7 +258,6 @@
   </div>
 </div>
 
-<!-- Data bundles -->
 <script src="assets/data/legend.js"></script>
 <script src="assets/data/geo_data.js"></script>
 <script src="assets/data/dss_data.js"></script>
@@ -145,12 +265,8 @@
 <script src="assets/data/ground_truth.js"></script>
 <script src="assets/data/rainfall.js"></script>
 <script src="assets/data/desilting.js"></script>
-
-<!-- Libraries -->
 <script src="assets/vendor/leaflet/leaflet.js"></script>
 <script src="assets/vendor/chart.umd.js"></script>
-
-<!-- App -->
 <script src="assets/app.js"></script>
 </body>
 </html>
